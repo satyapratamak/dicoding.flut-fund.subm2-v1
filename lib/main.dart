@@ -1,117 +1,202 @@
 import 'package:flutter/material.dart';
+import 'package:restaurant_search_app_v1/style.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart' as DotEnv;
+import 'package:dio/dio.dart';
 
-void main() {
-  runApp(MyApp());
+void main() async {
+  await DotEnv.load(fileName: '.env');
+  runApp(RestaurantSearchApp());
 }
 
-class MyApp extends StatelessWidget {
+class RestaurantSearchApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
-        // This makes the visual density adapt to the platform that you run
-        // the app on. For desktop platforms, the controls will be smaller and
-        // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: SearchPage(title: 'Restaurant App'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+class SearchPage extends StatefulWidget {
+  SearchPage({Key key, this.title}) : super(key: key);
 
   final String title;
 
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: 'https://developers.zomato.com/api/v2.1/search',
+      headers: {
+        'user-key': DotEnv.env['ZOMATO_API_KEY'],
+      },
+    ),
+  );
+
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _SearchPageState createState() => _SearchPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _SearchPageState extends State<SearchPage> {
+  List _restaurants;
 
-  void _incrementCounter() {
+  void searchRestaurants(String query) async {
+    final response = await widget.dio.get(
+      '',
+      queryParameters: {
+        'q': query,
+      },
+    );
+    print(response);
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _restaurants = response.data['restaurants'];
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
+        centerTitle: true,
         title: Text(widget.title),
+        backgroundColor: color_tart_orange,
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
+            SearchForm(onSearch: searchRestaurants),
+            _restaurants == null
+                ? Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search,
+                          color: Colors.black12,
+                          size: 110,
+                        ),
+                        Text(
+                          'No Results to display',
+                          style: TextStyle(
+                            color: Colors.black12,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      ],
+                    ),
+                  )
+                : Expanded(
+                    child: ListView(
+                      children: _restaurants.map((restaurant) {
+                        return ListTile(
+                          title: Text(restaurant['restaurant']['name']),
+                          subtitle: Text(
+                            restaurant['restaurant']['location']['address'],
+                          ),
+                          trailing: Text(
+                              '${restaurant['restaurant']['user_rating']['aggregate_rating']} stars, ${restaurant['restaurant']['all_reviews_count']} reviews'),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SearchForm extends StatefulWidget {
+  SearchForm({this.onSearch});
+
+  //final void Functon(String search) onSearch;
+  final void Function(String search) onSearch;
+  @override
+  _SearchFormState createState() => _SearchFormState();
+}
+
+class _SearchFormState extends State<SearchForm> {
+  final _formKey = GlobalKey<FormState>();
+  var _autoValidateMode = AutovalidateMode.disabled;
+  var _search;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Form(
+        key: _formKey,
+        autovalidateMode: _autoValidateMode,
+        child: Column(
+          children: [
+            TextFormField(
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.search,
+                ),
+                hintText: 'Enter Restaurant, Food, etc..',
+                border: OutlineInputBorder(),
+                filled: true,
+                errorStyle: TextStyle(fontSize: 18),
+              ),
+              onChanged: (value) {
+                _search = value;
+              },
+              validator: (value) {
+                if (value.isEmpty) {
+                  return "Please enter a search term..";
+                }
+                return null;
+              },
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+            SizedBox(
+              height: 10,
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: RawMaterialButton(
+                onPressed: () {
+                  final isValid = _formKey.currentState.validate();
+
+                  if (isValid) {
+                    // TODO Searching
+                    setState(() {
+                      _autoValidateMode = AutovalidateMode.disabled;
+                    });
+                    widget.onSearch(_search);
+                  } else {
+                    // TODO set autovalidate = true
+                    setState(() {
+                      _autoValidateMode = AutovalidateMode.always;
+                    });
+                  }
+                },
+                fillColor: color_tart_orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(15),
+                  child: Text(
+                    "SEARCH",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
