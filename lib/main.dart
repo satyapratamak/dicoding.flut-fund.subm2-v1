@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:restaurant_search_app_v1/model/mod_restaurant.dart';
 import 'package:restaurant_search_app_v1/style.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart' as DotEnv;
 import 'package:dio/dio.dart';
@@ -43,9 +44,9 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> {
-  List _restaurants;
+  String query;
 
-  void searchRestaurants(String query) async {
+  Future<List> searchRestaurants(String query) async {
     final response = await widget.dio.get(
       '',
       queryParameters: {
@@ -54,9 +55,7 @@ class _SearchPageState extends State<SearchPage> {
     );
     print(response);
 
-    setState(() {
-      _restaurants = response.data['restaurants'];
-    });
+    return response.data['restaurants'];
   }
 
   @override
@@ -71,8 +70,14 @@ class _SearchPageState extends State<SearchPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
-            SearchForm(onSearch: searchRestaurants),
-            _restaurants == null
+            SearchForm(
+              onSearch: (q) {
+                setState(() {
+                  query = q;
+                });
+              },
+            ),
+            query == null
                 ? Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -93,23 +98,49 @@ class _SearchPageState extends State<SearchPage> {
                       ],
                     ),
                   )
-                : Expanded(
-                    child: ListView(
-                      children: _restaurants.map((restaurant) {
-                        return ListTile(
-                          title: Text(restaurant['restaurant']['name']),
-                          subtitle: Text(
-                            restaurant['restaurant']['location']['address'],
-                          ),
-                          trailing: Text(
-                              '${restaurant['restaurant']['user_rating']['aggregate_rating']} stars, ${restaurant['restaurant']['all_reviews_count']} reviews'),
+                : FutureBuilder(
+                    future: searchRestaurants(query),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(
+                          child: CircularProgressIndicator(),
                         );
-                      }).toList(),
-                    ),
+                      }
+                      if (snapshot.hasData) {
+                        return Expanded(
+                          child: ListView(
+                            children: snapshot.data
+                                .map<Widget>(
+                                    (json) => RestaurantItem(Restaurant(json)))
+                                .toList(),
+                          ),
+                        );
+                      }
+
+                      return Text(
+                          'Error retrieving results: ${snapshot.error}');
+                    },
                   ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class RestaurantItem extends StatelessWidget {
+  final Restaurant restaurant;
+  RestaurantItem(this.restaurant);
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(restaurant.name),
+      subtitle: Text(
+        restaurant.address,
+      ),
+      trailing:
+          Text('${restaurant.rating} stars, ${restaurant.reviews} reviews'),
     );
   }
 }
