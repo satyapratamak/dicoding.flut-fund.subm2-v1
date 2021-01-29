@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:restaurant_search_app_v1/model/mod_category.dart';
 import 'package:restaurant_search_app_v1/model/mod_restaurant.dart';
+import 'package:restaurant_search_app_v1/model/mod_search_options.dart';
 import 'package:restaurant_search_app_v1/style.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart' as DotEnv;
 import 'package:dio/dio.dart';
@@ -10,6 +12,16 @@ void main() async {
   await DotEnv.load(fileName: '.env');
   runApp(RestaurantSearchApp());
 }
+
+final dio = Dio(
+  BaseOptions(
+    baseUrl: 'https://developers.zomato.com/api/v2.1/',
+    headers: {
+      'user-key': DotEnv.env['ZOMATO_API_KEY'],
+      'Accept': 'application/json',
+    },
+  ),
+);
 
 class RestaurantSearchApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -32,15 +44,6 @@ class SearchPage extends StatefulWidget {
 
   final String title;
 
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: 'https://developers.zomato.com/api/v2.1/search',
-      headers: {
-        'user-key': DotEnv.env['ZOMATO_API_KEY'],
-      },
-    ),
-  );
-
   @override
   _SearchPageState createState() => _SearchPageState();
 }
@@ -49,8 +52,8 @@ class _SearchPageState extends State<SearchPage> {
   String query;
 
   Future<List> searchRestaurants(String query) async {
-    final response = await widget.dio.get(
-      '',
+    final response = await dio.get(
+      'search',
       queryParameters: {
         'q': query,
         //'sort': 'rating',
@@ -358,11 +361,47 @@ class _SearchFormState extends State<SearchForm> {
 }
 
 class SearchFilters extends StatefulWidget {
+  final locations = ['city', 'subzone', 'zone', 'landmark', 'metro', 'group'];
+  final sort = ['cost', 'rating'];
+  final order = ['asc', 'desc'];
+  final count = 20; // result of ZOMATO API
   @override
   _SearchFiltersState createState() => _SearchFiltersState();
 }
 
 class _SearchFiltersState extends State<SearchFilters> {
+  List<Category> _categories;
+  SearchOptions _searchOptions;
+  //List<int> _selectedCategoris = [];
+
+  Future<List<Category>> getCategories() async {
+    final response = await dio.get('categories');
+    final data = response.data['categories'];
+    return data
+        .map<Category>((json) => Category(
+              json['categories']['id'],
+              json['categories']['name'],
+            ))
+        .toList();
+  }
+
+  void initState() {
+    super.initState();
+
+    //setState(() {
+    _searchOptions = SearchOptions(
+      location: widget.locations.first,
+      sort: widget.sort.first,
+    );
+    //});
+
+    getCategories().then((categories) {
+      setState(() {
+        _categories = categories;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -370,8 +409,160 @@ class _SearchFiltersState extends State<SearchFilters> {
         title: Text('Filter your search'),
         backgroundColor: color_tart_orange,
       ),
-      body: Text(
-        'Filter your search',
+      body: Container(
+        child: ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 15,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 15,
+                  ),
+                  Text(
+                    'Categories: ',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  _categories is List<Category>
+                      ? Wrap(
+                          spacing: 10,
+                          children: List<Widget>.generate(_categories.length,
+                              (index) {
+                            final category = _categories[index];
+                            final isSelected =
+                                _searchOptions.categories.contains(category.id);
+                            return FilterChip(
+                              label: Text(category.name),
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Theme.of(context)
+                                        .textTheme
+                                        .bodyText1
+                                        .color,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              selected: isSelected,
+                              selectedColor: color_tart_orange,
+                              checkmarkColor: Colors.white,
+                              onSelected: (bool selected) {
+                                setState(() {
+                                  selected
+                                      ? _searchOptions.categories
+                                          .add(category.id)
+                                      : _searchOptions.categories
+                                          .remove(category.id);
+                                });
+                              },
+                            );
+                          }),
+                        )
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                  SizedBox(
+                    height: 15,
+                  ),
+                  Text(
+                    'Location type:',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: _searchOptions.location,
+                    items: widget.locations.map<DropdownMenuItem<String>>(
+                      (value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      },
+                    ).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchOptions.location = value;
+                      });
+                    },
+                  ),
+                  SizedBox(
+                    height: 15,
+                  ),
+                  Text(
+                    'Order by:',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  for (int idx = 0; idx < widget.order.length; idx++)
+                    RadioListTile(
+                        title: Text(widget.order[idx]),
+                        value: widget.order[idx],
+                        groupValue: _searchOptions.order,
+                        onChanged: (selection) {
+                          setState(() {
+                            _searchOptions.order = selection;
+                          });
+                        }),
+                  SizedBox(
+                    height: 15,
+                  ),
+                  Text(
+                    'Sort by:',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 10,
+                    children: widget.sort.map<ChoiceChip>((sort) {
+                      return ChoiceChip(
+                        label: Text(sort),
+                        selected: _searchOptions.sort == sort,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() {
+                              _searchOptions.sort = sort;
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(
+                    height: 15,
+                  ),
+                  Text(
+                    'Number of result:',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Slider(
+                    value: 10,
+                    min: 5,
+                    max: 20,
+                    onChanged: (value) {},
+                  )
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

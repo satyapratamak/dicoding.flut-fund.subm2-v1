@@ -20,7 +20,7 @@ class Restaurant {
   });
 
   factory Restaurant(Map json) => Restaurant._(
-        id: json['restaurant']['id'],
+        id: json['restaurant']['id'].toString(),
         name: json['restaurant']['name'],
         address: json['restaurant']['location']['address'],
         locality: json['restaurant']['location']['locality'],
