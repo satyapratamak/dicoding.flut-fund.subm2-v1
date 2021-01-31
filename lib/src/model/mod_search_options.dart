@@ -13,4 +13,12 @@ class SearchOptions {
     this.sort,
     this.count,
   });
+
+  Map<String, dynamic> toJson() => {
+        'location': location,
+        'sort': sort,
+        'count': count,
+        'order': order,
+        'category': categories.join(','),
+      };
 }

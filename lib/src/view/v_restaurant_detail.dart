@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:restaurant_search_app_v1/model/mod_restaurant.dart';
+import 'package:restaurant_search_app_v1/src/model/mod_restaurant.dart';
+//import 'package:restaurant_search_app_v1/src/model/mod_restaurant.dart';
 import 'package:restaurant_search_app_v1/style.dart';
 
 class RestaurantDetailScreen extends StatelessWidget {

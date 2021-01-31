@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:restaurant_search_app_v1/src/app_restaurant_search.dart';
 
 import 'package:restaurant_search_app_v1/main.dart';
 
