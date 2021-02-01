@@ -15,7 +15,7 @@ class SearchOptions {
   });
 
   Map<String, dynamic> toJson() => {
-        'location': location,
+        'entity_type': location,
         'sort': sort,
         'count': count,
         'order': order,
